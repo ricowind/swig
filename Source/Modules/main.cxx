@@ -131,8 +131,8 @@ static const char *usage3 = (const char *) "\
 static const char *usage4 = (const char *) "\
      -O              - Enable the optimization options: \n\
                         -fastdispatch -fvirtual \n\
-     -o <outfile>    - Set name of the output file to <outfile>\n\
-     -oh <headfile>  - Set name of the output header file to <headfile>\n\
+     -o <outfile>    - Set name of C/C++ output file to <outfile>\n\
+     -oh <headfile>  - Set name of C++ output header file for directors to <headfile>\n\
      -outcurrentdir  - Set default output dir to current dir instead of input file's path\n\
      -outdir <dir>   - Set language specific files output directory to <dir>\n\
      -pcreversion    - Display PCRE version information\n\
@@ -595,7 +595,7 @@ void SWIG_getoptions(int argc, char *argv[]) {
           Swig_filename_correct(outfile_name);
 	  if (!outfile_name_h || !dependencies_file) {
 	    char *ext = strrchr(Char(outfile_name), '.');
-	    String *basename = ext ? NewStringWithSize(Char(outfile_name), Char(ext) - Char(outfile_name)) : NewString(outfile_name);
+	    String *basename = ext ? NewStringWithSize(Char(outfile_name), (int)(Char(ext) - Char(outfile_name))) : NewString(outfile_name);
 	    if (!dependencies_file) {
 	      dependencies_file = NewStringf("%s.%s", basename, depends_extension);
 	    }
@@ -899,7 +899,7 @@ int SWIG_main(int argc, char *argv[], Language *l) {
   String *vers = NewString("SWIG_VERSION 0x");
   int count = 0;
   while (token) {
-    int len = strlen(token);
+    int len = (int)strlen(token);
     assert(len == 1 || len == 2);
     Printf(vers, "%s%s", (len == 1) ? "0" : "", token);
     token = strtok(NULL, ".");

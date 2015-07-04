@@ -5,6 +5,35 @@ See the RELEASENOTES file for a summary of changes in each release.
 Version 3.0.6 (in progress)
 ===========================
 
+2015-07-02: wsfulton
+	    Fix syntax error when the template keyword is used in types, eg:
+
+              std::template vector<int> v;
+
+2015-07-02: ngladitz
+	    [Lua] Push characters as unformatted 1-character strings to avoid
+	    unprintable characters such as (char)127 being converted to
+	    "<\127>" with Lua 5.3 and later.  (github PR #452)
+
+2015-06-29: olly
+	    [Python] Improve handling of whitespace in %pythoncode.
+
+	    Previously SWIG looked at the indentation of the first line and
+	    removed that many characters from each subsequent line, regardless
+	    of what those characters were.  This was made worse because SWIG's
+	    preprocessor removes any whitespace before a '#'.  Fixes github
+	    issue #379, reported by Joe Orton.
+
+2015-06-12: wsfulton
+	    [R] Fix #430 - call to SWIG_createNewRef in copyToC was incorrectly named.
+
+2015-06-11: sghirate
+	    [C#] Patch #427 adds in new command line option -outfile to combine all the
+            generated C# code into a single file.
+
+2015-06-09: wsfulton
+	    Fix seg fault processing C++11 type aliasing. Issue #424.
+
 2015-05-28: wsfulton
 	    [Python] Add new feature "python:cdefaultargs" to control default argument
             code generation. By default, SWIG attempts to convert C/C++ default argument values

@@ -138,6 +138,7 @@ CPP_TEST_CASES += \
 	casts \
 	char_binary \
 	char_strings \
+	chartest \
 	class_forward \
 	class_ignore \
 	class_scope_weird \
@@ -246,6 +247,7 @@ CPP_TEST_CASES += \
 	ignore_parameter \
 	import_nomodule \
 	inherit \
+	inherit_member \
 	inherit_missing \
 	inherit_same_name \
 	inherit_target_language \
@@ -410,6 +412,7 @@ CPP_TEST_CASES += \
 	template_inherit \
 	template_inherit_abstract \
 	template_int_const \
+	template_keyword_in_type \
 	template_methods \
 	template_namespace_forward_declaration \
 	template_using_directive_and_declaration_forward \
@@ -543,6 +546,7 @@ CPP11_TEST_CASES = \
 	cpp11_template_explicit \
 	cpp11_template_typedefs \
 	cpp11_type_traits \
+	cpp11_type_aliasing \
 	cpp11_uniform_initialization \
 	cpp11_unrestricted_unions \
 	cpp11_userdefined_literals \
