@@ -51,6 +51,7 @@ extern "C" {
   Language *swig_r(void);
   Language *swig_scilab(void);
   Language *swig_go(void);
+  Language *swig_dart(void);
   Language *swig_d(void);
   Language *swig_javascript(void);
 }
@@ -73,6 +74,7 @@ static swig_module modules[] = {
   {"-csharp", swig_csharp, "C#"},
   {"-d", swig_d, "D"},
   {"-go", swig_go, "Go"},
+  {"-dart", swig_dart, "Dart"},
   {"-guile", swig_guile, "Guile"},
   {"-java", swig_java, "Java"},
   {"-javascript", swig_javascript, "Javascript"},
