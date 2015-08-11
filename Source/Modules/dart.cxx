@@ -15,10 +15,16 @@
 class DART:public Language {
 protected:
    File *f_dart;
+   File *f_c;
    File *f_dart_head;
    File *f_dart_body;
    File *f_dart_end;
    int indentation;
+
+   // Users can pass in the location of the library file (normally .so on
+   // linux, .dylib on mac. By default we assume that the library file is
+   // named the same as the module and placed
+   String libary_file;
 
 public:
   DART():
@@ -79,7 +85,12 @@ public:
     String *dart_filename = NewString("");
 
     Printf(dart_filename, "%s%s.dart", SWIG_output_directory(), module);
+
+    String *c_filename = Getattr(n, "outfile");
+    //    Printf(c_filename, "%s%s.c", SWIG_output_directory(), module);
+
     f_dart = NewFile(dart_filename, "w", SWIG_output_files());
+    f_c = NewFile(c_filename, "w", SWIG_output_files());
     if (!f_dart) {
        FileErrorDisplay(dart_filename);
        SWIG_exit(EXIT_FAILURE);
@@ -96,6 +107,8 @@ public:
     Swig_register_filebyname("dart_head", f_dart_head);
     Swig_register_filebyname("dart_body", f_dart_body);
     Swig_register_filebyname("dart_end", f_dart_end);
+    Swig_banner(f_null);
+
 
     emit_library_load(n);
     /* Emit code for children */
@@ -105,19 +118,31 @@ public:
     Dump(f_dart_head, f_dart);
     Dump(f_dart_body, f_dart);
     Dump(f_dart_end, f_dart);
+    Dump(f_null, f_c);
 
     /* Cleanup files */
+    Delete(f_c);
     Delete(f_dart);
     Delete(f_dart_head);
     Delete(f_dart_body);
     Delete(f_dart_end);
     Delete(f_null);
-    printf("node %p\n", n);
     assert(indentation == 0);
     return SWIG_OK;
   }
 
   virtual int functionWrapper(Node *n) {
+    if (!Strcmp(nodeType(n), "cdecl") == 0) return SWIG_OK;
+
+    String *view = Getattr(n, "view");
+    Printf(stdout, "View: %s\n", view);
+
+    String *kind = Getattr(n, "kind");
+    Printf(stdout, "Kind: %s\n", kind);
+
+    // Currently no support for variables.
+    if (Strcmp(kind, "variable") == 0) return SWIG_OK;
+
     String *funcname = Getattr(n, "sym:name");
     ParmList *pl = Getattr(n, "parms");
     Parm *p;
@@ -145,7 +170,7 @@ public:
     }
 
     Printf(f_dart_body, "}\n");
-    // String *name = Getattr(n, "name");
+    // String *name = Getattr(, "name");
     // String *iname   = Getattr(n,"sym:name");
     // SwigType *type   = Getattr(n,"type");
     // ParmList *parms  = Getattr(n,"parms");

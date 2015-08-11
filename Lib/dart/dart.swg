@@ -35,7 +35,10 @@ class __FFIWrapper__ {
 
 %insert(dart_end) %{
 void main() {
-  print("Calling SetCount: ${SetCount(42, 42)}");
+  print("Calling GetCount: ${GetCount()}");
+  print("Calling setup: ${setup()}");
+  print("Calling SetCount(42, 42): ${SetCount(42, 42)}");
+  print("Calling GetCount: ${GetCount()}");
 }
 
 %}

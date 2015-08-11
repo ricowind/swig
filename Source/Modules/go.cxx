@@ -462,6 +462,8 @@ private:
     fclose(swig_input);
     unique_id = NewString("");
     Printf(unique_id, "_%s_%08x%08x", getModuleName(package), hash.hi, hash.lo);
+    Printf(stdout, "%s\n\n", unique_id);
+
 
     // Open files.
 
@@ -673,6 +675,7 @@ private:
       Printv(f_cgo_comment, "\n", NULL);
     }
 
+    Printf(stdout, "%s", f_c_wrappers);
     Dump(f_c_runtime, f_c_begin);
     Dump(f_c_wrappers, f_c_begin);
     Dump(f_c_init, f_c_begin);
