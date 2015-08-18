@@ -23,8 +23,8 @@ protected:
 
    // Users can pass in the location of the library file (normally .so on
    // linux, .dylib on mac. By default we assume that the library file is
-   // named the same as the module and placed
-   String libary_file;
+   // named the same as the module.
+   String *library_file;
 
 public:
   DART():
@@ -36,24 +36,32 @@ public:
    * main()
    * ------------------------------------------------------------ */
   virtual void main(int argc, char *argv[]) {
+    Printf(stdout, "start running\n\n");
+
     for (int i = 1; i < argc; i++) {
-      if (argv[i] && strcmp(argv[i],"-library_file") == 0) {
-        printf("Arg %d: %s\n", i, argv[i]);
-        Swig_mark_arg(i);
+      if (argv[i] && strcmp(argv[i], "-soname") == 0) {
+        if (argv[i + 1]) {
+          library_file = NewString(argv[i + 1]);
+          Swig_mark_arg(i);
+          Swig_mark_arg(i + 1);
+          i++;
+        } else {
+          Swig_arg_error();
+        }
       }
     }
 
-   /* Set language-specific subdirectory in SWIG library */
-   SWIG_library_directory("dart");
+    /* Set language-specific subdirectory in SWIG library */
+    SWIG_library_directory("dart");
 
-   /* Set language-specific preprocessing symbol */
-   Preprocessor_define("SWIGDART 1", 0);
+    /* Set language-specific preprocessing symbol */
+    Preprocessor_define("SWIGDART 1", 0);
 
-   /* Set language-specific configuration file */
-   SWIG_config_file("dart.swg");
+    /* Set language-specific configuration file */
+    SWIG_config_file("dart.swg");
 
-   /* Set typemap language (historical) */
-   SWIG_typemap_lang("dart");
+    /* Set typemap language (historical) */
+    SWIG_typemap_lang("dart");
 
   }
 
@@ -74,9 +82,19 @@ public:
   }
 
   void emit_library_load(Node *n) {
-    String *module = Getattr(n, "name");
+    String *module;
+    if (library_file) {
+      module = library_file;
+    } else {
+      module = NewString("");
+      Printf(module, "%s.so", Getattr(n, "name"));
+    }
     Printf(f_dart_body,
-           "__FFIWrapper__ __wrapper__ = new __FFIWrapper__('%s.so');\n\n",
+           "final Uri __$uri__ = Uri.base.resolve('%s');\n",
+           module);
+
+    Printf(f_dart_body,
+           "final __$library__ = new ForeignLibrary.fromName(__$uri__.path);\n\n",
            module);
   }
 
@@ -131,14 +149,124 @@ public:
     return SWIG_OK;
   }
 
-  virtual int functionWrapper(Node *n) {
-    if (!Strcmp(nodeType(n), "cdecl") == 0) return SWIG_OK;
+  int getSize(String *type) {
+    // TODO(ricow): refactor
+    if (Strcmp(type, "double") == 0) {
+      return 8;
+    } else if (Strcmp(type, "int") == 0) {
+      return 4;
+    } else {
+      Printf(stderr, "Don't know size of %s\n", type);
+      SWIG_exit(EXIT_FAILURE);
+      return 0;
+    }
+  }
 
-    String *view = Getattr(n, "view");
-    Printf(stdout, "View: %s\n", view);
+  String *getFFIGetter(String *type) {
+    // TODO(ricow): refactor
+    if (Strcmp(type, "double") == 0) {
+      return NewString("getFloat64");
+    } else if (Strcmp(type, "int") == 0) {
+      return NewString("getInt32");
+    } else {
+      Printf(stderr, "Don't know size of %s\n", type);
+      SWIG_exit(EXIT_FAILURE);
+      return 0;
+
+    }
+  }
+
+  String *getFFISetter(String *type) {
+    // TODO(ricow): refactor
+    if (Strcmp(type, "double") == 0) {
+      return NewString("setFloat64");
+    } else if (Strcmp(type, "int") == 0) {
+      return NewString("setInt32");
+    } else {
+      Printf(stderr, "Don't know size of %s\n", type);
+      SWIG_exit(EXIT_FAILURE);
+      return 0;
+
+    }
+  }
+
+  /* We explicitly catch this to not have the class expanded into constructors
+     All we really need is to know the type and name of the members
+  */
+  virtual int classDeclaration(Node *n) {
+    // STRUCTS ONLY FOR NOW
+    String *name = Getattr(n, "name");
+
+    Printf(stdout, "Calling classDeclaration %s\n", nodeType(n));
+    Printf(f_dart_body, "class %s {\n", name);
+    Printf(f_dart_body, "  ForeignMemory __$fmem__;\n");
+
+    Node *c;
+    String *constructor_parameters = NewString("");
+    String *constructor_initializers = NewString("");
+    int struct_size = 0;
+    for (c = firstChild(n); c; c = nextSibling(c)) {
+      Printf(stdout, "  Sibling %s\n", nodeType(c));
+      String *variable_type = Getattr(c, "type");
+      String *variable_name = Getattr(c, "name");
+      Printf(f_dart_body, "  %s get %s => ", variable_type, variable_name);
+      Printf(f_dart_body, "__$fmem__.%s(%d);\n", getFFIGetter(variable_type),
+             struct_size);
+      Printf(f_dart_body, "  set %s(%s val) => ", variable_name, variable_type);
+      Printf(f_dart_body, "__$fmem__.%s(%d, val);\n",
+             getFFISetter(variable_type),
+             struct_size);
+      Printf(constructor_initializers, "    __$fmem__.%s(%d, %s);\n",
+             getFFISetter(variable_type),
+             struct_size,
+             variable_name);
+
+      if (struct_size == 0) {
+        Printf(constructor_parameters, "%s %s", variable_type, variable_name);
+      } else {
+        Printf(constructor_parameters, ", %s %s", variable_type, variable_name);
+      }
+
+      struct_size += getSize(variable_type);
+    }
+    Printf(f_dart_body, "  %s(%s) {\n", name, constructor_parameters);
+    Printf(f_dart_body, "    __$fmem__ = new ForeignMemory.allocated(%d);\n",
+           struct_size);
+    Printf(f_dart_body, "%s\n",
+           constructor_initializers);
+
+    Printf(f_dart_body, "  }\n");
+    Printf(f_dart_body, "}\n\n");
+    return SWIG_OK;
+  }
+
+
+  virtual int constantWrapper(Node *n) {
+    Printf(stdout, "Calling constantWrapper %s\n", nodeType(n));
+    return SWIG_OK;
+  }
+  virtual int variableWrapper(Node *n) {
+    Printf(stdout, "Calling variableWrapper %s\n", nodeType(n));
+    Printf(stdout, "Name %s\n", Getattr(n, "name"));
+    return SWIG_OK;
+  }
+  virtual int nativeWrapper(Node *n) {
+    Printf(stdout, "Calling nativeWrapper %s\n", nodeType(n));
+    return SWIG_OK;
+  }
+
+  virtual int classDirector(Node *n) {
+    Printf(stdout, "Calling classDirector %s\n", nodeType(n));
+    return SWIG_OK;
+  }
+
+  virtual int functionWrapper(Node *n) {
+    if (!Strcmp(nodeType(n), "cdecl") == 0) {
+      Printf(stdout, "Not handling: %s\n", nodeType(n));
+      return SWIG_OK;
+    }
 
     String *kind = Getattr(n, "kind");
-    Printf(stdout, "Kind: %s\n", kind);
 
     // Currently no support for variables.
     if (Strcmp(kind, "variable") == 0) return SWIG_OK;
@@ -147,29 +275,43 @@ public:
     ParmList *pl = Getattr(n, "parms");
     Parm *p;
     String *raw_return_type = Swig_typemap_lookup("darttype", n, "", 0);
+    // Create lazy initialized function lookup
+    Printf(f_dart_body, "final __$%s__ = __$library__.lookup('%s');\n",
+           funcname, funcname);
+
     Printf(f_dart_body, "%s ", raw_return_type);
     int argnum = 0;
     Printf(f_dart_body, "%s(", funcname);
     String *arguments = NewString("");
     for (p = pl; p; p = nextSibling(p), argnum++) {
       String *arg_type = Swig_typemap_lookup("darttype", p, "", 0);
+      Swig_print(p);
       String *name  = Getattr(p,"name");
       if (argnum > 0) Printf(f_dart_body, ", ");
       Printf(f_dart_body, "%s %s", arg_type, name);
 
       // We later pass these on to the icall
       if (argnum > 0) Printf(arguments, ", ");
-      Printf(arguments, "%s", name);
+
+      // If there was no arg type we assume that this is a wrapped foreign
+      // memory.
+      if (!arg_type) {
+        Printf(arguments, "%s.__$fmem__", name);
+      } else {
+        Printf(arguments, "%s", name);
+      }
+
     }
     Printf(f_dart_body, ") {\n");
     if (Strcmp(raw_return_type, "int") == 0) {
-      Printf(f_dart_body,
-             "  ForeignFunction f = __wrapper__.getFunction('%s');\n",
-             funcname);
-      Printf(f_dart_body, "  return f.icall$%d(%s);\n", argnum, arguments);
+      // Printf(f_dart_body,
+      //        "  ForeignFunction f = __$wrapper__.getFunction('%s');\n",
+      //        funcname);
+      Printf(f_dart_body, "  return __$%s__.icall$%d(%s);\n",
+             funcname, argnum, arguments);
     }
 
-    Printf(f_dart_body, "}\n");
+    Printf(f_dart_body, "}\n\n");
     // String *name = Getattr(, "name");
     // String *iname   = Getattr(n,"sym:name");
     // SwigType *type   = Getattr(n,"type");
