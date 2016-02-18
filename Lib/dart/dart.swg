@@ -5,12 +5,24 @@
  * ------------------------------------------------------------ */
 
 
-%typemap(darttype) int "int";
 %typemap(darttype) double "double";
+
+%typemap(darttype) int "int";
+%typemap(darttype) signed int "int";
+%typemap(darttype) unsigned int "int";
+%typemap(darttype) long "int";
+%typemap(darttype) signed long "int";
+%typemap(darttype) unsigned long "int";
+
+%typemap(darttype) char * "String";
+
 %typemap(darttype) void "void";
 
+
+
+
 %insert(dart_head) %{
-// This is generated code, only touch this if you know what you are\n
+// This is generated code, only touch this if you know what you are
 // doing.
 
 import 'dart:fletch.ffi';

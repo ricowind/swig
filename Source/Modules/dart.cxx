@@ -14,21 +14,24 @@
 
 class DART:public Language {
 protected:
-   File *f_dart;
-   File *f_c;
-   File *f_dart_head;
-   File *f_dart_body;
-   File *f_dart_end;
-   int indentation;
+  File *f_dart;
+  File *f_c;
+  File *f_dart_head;
+  File *f_dart_body;
+  File *f_dart_end;
+  int indentation;
 
-   // Users can pass in the location of the library file (normally .so on
-   // linux, .dylib on mac. By default we assume that the library file is
-   // named the same as the module.
-   String *library_file;
+  // Users can pass in the location of the library file (normally .so on
+  // linux, .dylib on mac. By default we assume that the library file is
+  // named the same as the module.
+  String *library_file;
+
+  Hash *class_types;
 
 public:
   DART():
-    indentation(0) {
+    indentation(0),
+    class_types(NULL){
   }
 
 
@@ -99,6 +102,8 @@ public:
   }
 
   virtual int top(Node *n) {
+    class_types = NewHash();
+
     String *module = Getattr(n, "name");
     String *dart_filename = NewString("");
 
@@ -196,7 +201,7 @@ public:
   virtual int classDeclaration(Node *n) {
     // STRUCTS ONLY FOR NOW
     String *name = Getattr(n, "name");
-
+    Swig_print(n);
     Printf(stdout, "Calling classDeclaration %s\n", nodeType(n));
     Printf(f_dart_body, "class %s {\n", name);
     Printf(f_dart_body, "  ForeignMemory __$fmem__;\n");
@@ -237,6 +242,10 @@ public:
 
     Printf(f_dart_body, "  }\n");
     Printf(f_dart_body, "}\n\n");
+    // Register the type so that we can used it for declarations later on.
+    Parm *pattern = NewParm(name, NULL, n);
+    Swig_typemap_register("darttype", pattern, name, NULL, NULL);
+
     return SWIG_OK;
   }
 
@@ -257,6 +266,68 @@ public:
 
   virtual int classDirector(Node *n) {
     Printf(stdout, "Calling classDirector %s\n", nodeType(n));
+    return SWIG_OK;
+  }
+
+  virtual int functionHandler(Node *n) {
+    if (!Strcmp(nodeType(n), "cdecl") == 0) {
+      Printf(stdout, "Not handling: %s\n", nodeType(n));
+      return SWIG_OK;
+    }
+
+    String *kind = Getattr(n, "kind");
+
+    // Currently no support for variables.
+    if (Strcmp(kind, "variable") == 0) return SWIG_OK;
+
+    String *funcname = Getattr(n, "sym:name");
+    ParmList *pl = Getattr(n, "parms");
+    Parm *p;
+    String *raw_return_type = Swig_typemap_lookup("darttype", n, "", 0);
+    // Create lazy initialized function lookup
+    Printf(f_dart_body, "final __$%s__ = __$library__.lookup('%s');\n",
+           funcname, funcname);
+
+    Printf(f_dart_body, "%s ", raw_return_type);
+    int argnum = 0;
+    Printf(f_dart_body, "%s(", funcname);
+    String *arguments = NewString("");
+    for (p = pl; p; p = nextSibling(p), argnum++) {
+      String *arg_type = Swig_typemap_lookup("darttype", , "", 0);
+      Printf(stdout, "foobar: %s\n", arg_type);
+      Swig_print(p);
+      String *name  = Getattr(p,"name");
+      if (argnum > 0) Printf(f_dart_body, ", ");
+      Printf(f_dart_body, "%s %s", arg_type, name);
+
+      // We later pass these on to the icall
+      if (argnum > 0) Printf(arguments, ", ");
+
+      // If there was no arg type we assume that this is a wrapped foreign
+      // memory.
+      if (!arg_type) {
+        Printf(arguments, "%s.__$fmem__", name);
+      } else {
+        Printf(arguments, "%s", name);
+      }
+
+    }
+    Printf(f_dart_body, ") {\n");
+    if (Strcmp(raw_return_type, "int") == 0) {
+      // Printf(f_dart_body,
+      //        "  ForeignFunction f = __$wrapper__.getFunction('%s');\n",
+      //        funcname);
+      Printf(f_dart_body, "  return __$%s__.icall$%d(%s);\n",
+             funcname, argnum, arguments);
+    }
+
+    Printf(f_dart_body, "}\n\n");
+    // String *name = Getattr(, "name");
+    // String *iname   = Getattr(n,"sym:name");
+    // SwigType *type   = Getattr(n,"type");
+    // ParmList *parms  = Getattr(n,"parms");
+
+
     return SWIG_OK;
   }
 
@@ -285,7 +356,7 @@ public:
     String *arguments = NewString("");
     for (p = pl; p; p = nextSibling(p), argnum++) {
       String *arg_type = Swig_typemap_lookup("darttype", p, "", 0);
-      Swig_print(p);
+      //      Swig_print(p);
       String *name  = Getattr(p,"name");
       if (argnum > 0) Printf(f_dart_body, ", ");
       Printf(f_dart_body, "%s %s", arg_type, name);
